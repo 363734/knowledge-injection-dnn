@@ -12,6 +12,7 @@ import csv
 import seaborn as sns
 import matplotlib.pyplot as plt
 import math
+from bridgeJava import java_entry_point, list_int_to_java_array
 
 ########################################################################################################################
 
@@ -49,6 +50,7 @@ class PLSInstance:
         """
         # (n, n) variables; n possible values; the index represents the value; 1 means removed from the domain
         self.domains = np.zeros(shape=(self.n, self.n, self.n), dtype=np.int8)
+        self.believes = np.zeros(shape=(self.n, self.n, self.n), dtype=np.float64)
 
     def set_square(self, square, forward=False):
         """
@@ -63,6 +65,7 @@ class PLSInstance:
         if feas and forward:
             self._init_var_domains()
             self._forward_checking()
+            self._propagate_believes()
 
         return feas
 
@@ -140,6 +143,27 @@ class PLSInstance:
                     if self.remove_columns_domains:
                         for id_row in range(self.n):
                             self.domains[id_row, j, assigned_val] = 1
+
+    def _propagate_believes(self):
+        solver = java_entry_point.buildSolver()
+        r = list_int_to_java_array(self.square.reshape(-1).tolist())
+        assigned = java_entry_point.buildModel(solver, self.n, r, self.remove_columns_domains)
+        for i in range(self.n):
+            for j in range(self.n):
+                if sum(self.domains[i,j]) != self.n:
+                    for k in range(self.n):
+                        if self.domains[i, j, k] == 1:
+                            java_entry_point.remove_from_domain(assigned[i*self.n+j], k+1)
+        bel = java_entry_point.propagate_believes(solver, assigned, self.n)
+
+        for i in range(self.n):
+            for j in range(self.n):
+                for k in range(self.n):
+                    if self.domains[i,j,k] == 0:
+                        self.believes[i, j, k] = 1.0-bel[(i*self.n+j)*self.n +k]
+                    else :
+                        self.believes[i, j, k] = 1.0
+
 
     def assign(self, cell_x, cell_y, num):
         """
@@ -286,10 +310,13 @@ def load_dataset(filename,
 
     with open(filename, mode="r") as file:
         domains_file = None
+        believe_file = None
 
         if save_domains:
             domains_file = open(domains_filename, "w", newline='')
             csv_writer = csv.writer(domains_file, delimiter=',')
+            believe_file = open("belief_"+domains_filename, "w", newline='')
+            csv_writer_believe = csv.writer(believe_file, delimiter=',')
 
         if save_partial_solutions:
             partial_sols_file = open(partial_sols_filename, "w")
@@ -342,6 +369,7 @@ def load_dataset(filename,
 
                         if save_domains:
                             csv_writer.writerow(tmp_problem.domains.reshape(-1))
+                            csv_writer_believe.writerow(tmp_problem.believes.reshape(-1))
                         if save_partial_solutions:
                             csv_writer_sols.writerow(assignment.reshape(-1))
                     else:
