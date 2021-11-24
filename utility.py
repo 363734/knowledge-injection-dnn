@@ -50,6 +50,8 @@ class PLSInstance:
         """
         # (n, n) variables; n possible values; the index represents the value; 1 means removed from the domain
         self.domains = np.zeros(shape=(self.n, self.n, self.n), dtype=np.int8)
+
+    def _init_believes(self):
         self.believes = np.zeros(shape=(self.n, self.n, self.n), dtype=np.float64)
         self.believes_w = np.zeros(shape=(self.n, self.n, self.n), dtype=np.float64)
 
@@ -66,9 +68,24 @@ class PLSInstance:
         if feas and forward:
             self._init_var_domains()
             self._forward_checking()
+            self._init_believes()
             self._propagate_believes()
 
         return feas
+
+    def set_square_fromSol(self, square, domains):
+        """
+        Public method to set the square.
+        :param square: the square as numpy array of shape (dim, dim, dim)
+        :param forward: True if you want to apply forward checking
+        :return: True if the assignement is feasible, False otherwise
+        """
+
+        self.square = square
+        self.domains = domains
+        self._init_believes()
+        self._propagate_believes()
+
 
     def _check_constraints(self):
         """
@@ -407,6 +424,8 @@ def load_dataset(filename,
 
         if save_domains:
             domains_file.close()
+            believe_file.close()
+            believe_weighted_file.close()
         if save_partial_solutions:
             partial_sols_file.close()
 
