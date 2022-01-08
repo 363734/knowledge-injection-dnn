@@ -6,11 +6,11 @@ Main program.
 
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import tensorflow as tf
 from utility import PLSInstance, PLSSolver, random_assigner
 from models import MyModel
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import csv
 import argparse
 import time
