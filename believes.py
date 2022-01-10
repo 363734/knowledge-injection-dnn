@@ -4,6 +4,7 @@ import math
 from utility import PLSInstance
 import numpy as np
 import csv
+import os
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -27,9 +28,11 @@ if __name__ == '__main__':
     elif args.domains_type == 'full':
         save_domains = True
 
-
+    
     partial_sol_filename = args.partial_sols_filename
     domains_filename = args.domains_filename
+
+    os.chdir(f"datasets/pls{args.dim}/")
 
     believe_file = open("belief_" + domains_filename, "w", newline='')
     csv_writer_believe = csv.writer(believe_file, delimiter=',')
