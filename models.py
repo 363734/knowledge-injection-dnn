@@ -26,7 +26,7 @@ class MyModel(tf.keras.Model):
         :param input_shape: input shape required by tf.keras; as a tuple.
         :param output_dim: number of output neurons; as integer.
         :param method: method to be applied to the NN; as string.
-        :param lmbd: lambda for SBR-inspired loss term.
+        :param lmbd: lambda for SBR-inspired floss term.
         """
 
         super(MyModel, self).__init__(name="mymodel")
@@ -35,7 +35,7 @@ class MyModel(tf.keras.Model):
         self.num_hidden = num_hidden
         self.output_dim = output_dim
 
-        available_methods = ['agnostic', 'sbrinspiredloss', 'negative', 'binary']
+        available_methods = ['agnostic', 'sbrinspiredloss', 'negative', 'binary', 'belief_cross_entropy', 'mse']
         if method not in available_methods:
             raise Exception("Method selected not valid")
         self.method = method
@@ -100,12 +100,16 @@ class MyModel(tf.keras.Model):
         # Categorical cross-entropy loss.
         cross_entropy_loss = \
             tf.reduce_mean(tf.keras.losses.categorical_crossentropy(tensor_y, y_pred, from_logits=True))
-
+   
+        # Belief cross-entropy loss.
+        belief_cross_entropy_loss = \
+            tf.reduce_mean(tf.keras.losses.categorical_crossentropy(1-tensor_p, y_pred, from_logits=False))
+        
         # MSE loss.
         sbr_inspired_loss = \
             tf.reduce_mean(tf.reduce_sum(tf.square((1 - tensor_p) - tf.nn.sigmoid(y_pred)), axis=1))
 
-        # "Negative" loss.
+        # Negative loss.
         negative_sbr_loss = tf.reduce_sum(tensor_p * tf.nn.sigmoid(y_pred))
         negative_sbr_loss = tf.reduce_mean(negative_sbr_loss)
 
@@ -121,6 +125,10 @@ class MyModel(tf.keras.Model):
             loss = cross_entropy_loss + negative_sbr_loss * self.lmbd
         elif self.method == 'binary':
             loss = cross_entropy_loss + binary_cross_entropy * self.lmbd
+        elif self.method == 'belief_cross_entropy':
+            loss = belief_cross_entropy_loss
+        elif self.method == 'mse':
+            loss = sbr_inspired_loss 
 
         return loss, cross_entropy_loss, sbr_inspired_loss
 
@@ -242,7 +250,7 @@ class MyModel(tf.keras.Model):
                     preds = self.model(x_val)
 
                     if use_prop:
-                       preds = preds * (1 - p_val)
+                        preds = preds * (1 - p_val)
 
                     feas = compute_feasibility_from_predictions(x_val, preds, dim)
                     print("Current feasibility: {} | Best feasibility: {}".format(feas, best_feas))

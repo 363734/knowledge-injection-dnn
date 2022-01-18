@@ -48,6 +48,8 @@ parser.add_argument("--num-epochs", default=300, type=int,
                     help="Number of training epochs.")
 parser.add_argument("--max-size", default=1000000, type=int,
                     help="Maximum number of training/test instances to be loaded.")
+parser.add_argument("--dataset", type=str, default="original", choices=["original", "belief", "belief_w"],
+                    help="original dataset is from the paper.")
 parser.add_argument("--load-mode", default="onehot", choices=["onehot", "string"],
                     help="Dataset loading mode.")
 parser.add_argument("--batch-size", default=1024, type=int,
@@ -57,7 +59,7 @@ parser.add_argument("--leave-columns-domains", action="store_true", default=Fals
 parser.add_argument("--num-sol", type=str, default="10k",
                     help="Number of solutions from which the training set has been generated; thousands are expressed "
                          + "with k (for example 10000=10k).")
-parser.add_argument("--model-type", default="agnostic", choices=["agnostic", "sbrinspiredloss", "negative", "binary"],
+parser.add_argument("--model-type", default="agnostic", choices=["agnostic", "sbrinspiredloss", "negative", "binary", "belief_cross_entropy", "mse"],
                     help="Choose the model type. 'agnostic' is the model-agnostic baseline. 'sbrinspiredloss', "
                          + "'negative' and 'binary' are relatively the mse, negative and binary-cross entropy versions"
                          + " of the SBR inspiredloss.")
@@ -106,35 +108,39 @@ BATCH_SIZE = int(args.batch_size)
 # True if you want to adopt SRB-inspired loss function
 MODEL_TYPE = args.model_type
 
+# Dataset of intrest
+DATASET = args.dataset+"_"
+if DATASET == "original_":
+    DATASET = ""
+
 if mode == "test":
     mode_char = "L"
 else:
     mode_char = "B"
 
 if not TRAIN:
-    file_name = "pls{}_10k".format(DIM)
+    file_name = f"pls{DIM}_{DATASET}10k"
 else:
-    file_name = "pls{}_{}".format(DIM, args.num_sol)
+    file_name = f"pls{DIM}_{DATASET}{args.num_sol}"
 
 VAL_SIZE = args.validation_size
 
 NUM_SOL = args.num_sol
 
 # Model name for both training and test
-model_name = "test-{}/".format(TEST_NUM)
 
 # Where to save plots
-SAVE_PATH = "plots/test-{}/".format(TEST_NUM)
+SAVE_PATH = f"plots/test-{DATASET}{TEST_NUM}/"
 try:
     os.makedirs(SAVE_PATH)
 except:
     print("Directory already exists")
 
 # Model name for both training and test
-model_name = "test-{}/".format(TEST_NUM)
+model_name = f"test-{DATASET}{TEST_NUM}/"
 
 # Where to save plots
-SAVE_PATH = "plots/test-{}/".format(TEST_NUM)
+SAVE_PATH = f"plots/test-{DATASET}{TEST_NUM}/"
 try:
     os.makedirs(SAVE_PATH)
 except:
@@ -148,7 +154,7 @@ val_indexes = None
 if VAL_SIZE > 0:
     print("Loading validation set...")
     start = time.time()
-    X_val = pd.read_csv("datasets/pls{}/partial_solutions_{}_train.csv".format(DIM, NUM_SOL),
+    X_val = pd.read_csv(f"datasets/pls{DIM}/partial_solutions_{NUM_SOL}_train.csv",
                         sep=',',
                         header=None,
                         nrows=MAX_SIZE,
@@ -156,11 +162,11 @@ if VAL_SIZE > 0:
 
     # Create penalties for the examples
     if MODEL_TYPE != 'agnostic':
-        P_val = pd.read_csv("datasets/pls{}/domains_train_{}.csv".format(DIM, NUM_SOL),
+        P_val = pd.read_csv(f"datasets/pls{DIM}/{DATASET}domains_train_{NUM_SOL}.csv",
                             sep=',',
                             header=None,
                             nrows=MAX_SIZE,
-                            dtype=np.int8).values
+                            dtype=np.float64 if DATASET != "" else np.int8).values
     else:
         P_val = np.zeros_like(X_val, dtype=np.int8)
 
@@ -193,13 +199,14 @@ if MODEL_TYPE == 'agnostic' and not args.use_prop:
     P = np.zeros_like(X, dtype=np.int8)
 else:
     if not args.leave_columns_domains:
-        penalties_filepath = "datasets/pls{}/domains_{}_{}.csv".format(DIM, mode, NUM_SOL)
+        penalties_filepath = f"datasets/pls{DIM}/{DATASET}domains_{mode}_{NUM_SOL}.csv"
     else:
         penalties_filepath = "datasets/pls{}/rows_propagation_domains_{}_{}.csv".format(DIM, mode, NUM_SOL)
 
     print("Loading penalties from {}...".format(penalties_filepath))
     start = time.time()
-    P = pd.read_csv(penalties_filepath, sep=',', header=None, nrows=MAX_SIZE, dtype=np.int8).values
+    P = pd.read_csv(penalties_filepath, sep=',', header=None, nrows=MAX_SIZE,
+                    dtype=np.float64 if DATASET != "" else np.int8).values
 end = time.time()
 print("Elapsed {} seconds, {} GB required".format((end - start), P.nbytes / 10**9))
 
